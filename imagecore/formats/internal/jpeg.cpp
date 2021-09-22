@@ -91,7 +91,9 @@ static void jpegError(j_common_ptr jinfo)
 
 static void jpegMessage(j_common_ptr jinfo)
 {
+	printf("hahah jpeg error: %s\n", s_JPEGLastError);
 	(*jinfo->err->format_message)(jinfo, s_JPEGLastError);
+	fprintf(stderr, "jpeg error: %s\n", s_JPEGLastError);
 }
 
 bool ImageReaderJPEG::Factory::matchesSignature(const uint8_t* sig, unsigned int sigLen)
@@ -159,17 +161,20 @@ ImageReaderJPEG::~ImageReaderJPEG()
 
 bool ImageReaderJPEG::initWithStorage(ImageReader::Storage* source)
 {
+	printf("entering initWithStorage: %p\n", source);
 	if( source == NULL ) {
+		printf("exiting false initWithStorage\n");
 		return false;
 	}
 
 	m_Source = source;
 	// Set up custom error handler.
 	m_JPEGDecompress.client_data = this;
-	m_JPEGDecompress.err = jpeg_std_error(&m_JPEGError.pub);
+	//m_JPEGDecompress.err = jpeg_std_error(&m_JPEGError.pub);
 	m_JPEGError.pub.error_exit = jpegError;
 	m_JPEGError.pub.output_message = jpegMessage;
 	if( setjmp(m_JPEGError.jmp) ) {
+		printf("error during jpeg init: %s\n", s_JPEGLastError);
 		fprintf(stderr, "error during jpeg init: %s\n", s_JPEGLastError);
 		return false;
 	}
@@ -179,20 +184,32 @@ bool ImageReaderJPEG::initWithStorage(ImageReader::Storage* source)
 	FILE* sourceFile;
 	uint8_t* buffer;
 	uint64_t length;
+
+	printf("moving initWithStorage\n");
+
 	if( source->asBuffer(buffer, length) ) {
+		printf("moving initWithStorage 2\n");
 		jpeg_mem_src(&m_JPEGDecompress, buffer, (unsigned long)length);
 	} else if( source->asFile(sourceFile) ) {
+		printf("moving initWithStorage 3\n");
 		jpeg_stdio_src(&m_JPEGDecompress, sourceFile);
 	} else {
+		printf("moving initWithStorage 4\n");
 		m_SourceManager = new SourceManager(source, this);
 		m_JPEGDecompress.src = m_SourceManager;
 	}
 
+	printf("moving initWithStorage 5\n");
+
 	// EXIF
 	jpeg_set_marker_processor(&m_JPEGDecompress, EXIF_MARKER, &handleJPEGMarker);
 
+	printf("moving initWithStorage 6\n");
+
 	// ICC Color Profile
 	setup_read_icc_profile(&m_JPEGDecompress);
+
+	printf("moving initWithStorage 7\n");
 
 	return true;
 }
@@ -843,27 +860,35 @@ ImageWriterJPEG::~ImageWriterJPEG()
 
 bool ImageWriterJPEG::initWithStorage(Storage* output)
 {
+	printf("entering initWithStorage: %p\n", output);
+
 	// Set up custom error handler.
 	m_JPEGCompress.client_data = this;
 	m_JPEGCompress.err = jpeg_std_error(&m_JPEGError.pub);
-	m_JPEGError.pub.error_exit = jpegError;
-	m_JPEGError.pub.output_message = jpegMessage;
+	//m_JPEGError.pub.error_exit = jpegError;
+	//m_JPEGError.pub.output_message = jpegMessage;
 
 	if( setjmp(m_JPEGError.jmp) ) {
+		printf("error during jpeg compress init: %s\n", s_JPEGLastError);
 		fprintf(stderr, "error during jpeg compress init: %s", s_JPEGLastError);
 		jpeg_destroy_compress(&m_JPEGCompress);
 		return false;
 	}
 
+	printf("before jpeg_create_compress\n");
 	jpeg_create_compress(&m_JPEGCompress);
+	printf("after jpeg_create_compress\n");
 
 	m_DestinationManager = new DestinationManager(output, this);
 	if( m_DestinationManager == NULL) {
+		printf("error: could not create destination manager\n");
 		fprintf(stderr, "error: could not create destination manager\n");
 		jpeg_destroy_compress(&m_JPEGCompress);
 		return false;
 	}
 	m_JPEGCompress.dest = m_DestinationManager;
+
+	printf("moving on 2\n");
 
 	return true;
 }
@@ -892,12 +917,15 @@ void ImageWriterJPEG::setCopyMetaData(bool copyMetaData)
 
 bool ImageWriterJPEG::beginWrite(unsigned int width, unsigned int height, EImageColorModel colorModel)
 {
+	printf("1\n");
 	if( setjmp(m_JPEGError.jmp) ) {
 		fprintf(stderr, "error during jpeg compress init: %s", s_JPEGLastError);
 		jpeg_destroy_compress(&m_JPEGCompress);
 		return false;
 	}
 
+
+	printf("2\n");
 	m_JPEGCompress.image_width = width;
 	m_JPEGCompress.image_height = height;
 	if( Image::colorModelIsRGBA(colorModel) ) {
@@ -910,23 +938,32 @@ bool ImageWriterJPEG::beginWrite(unsigned int width, unsigned int height, EImage
 		return false;
 	}
 
+	printf("3\n");
 	jpeg_set_defaults(&m_JPEGCompress);
+	printf("4\n");
 	jpeg_set_quality(&m_JPEGCompress, m_Quality, TRUE);
+	printf("5\n");
 	jpeg_set_colorspace(&m_JPEGCompress, JCS_YCbCr);
 
+	printf("6\n");
 	if( m_QuantTables != NULL ) {
+		printf("7\n");
 		jpeg_add_quant_table(&m_JPEGCompress, 0, m_QuantTables, 100, TRUE);
+		printf("8\n");
 		jpeg_add_quant_table(&m_JPEGCompress, 1, m_QuantTables + DCTSIZE2, 100, TRUE);
 	}
 
+	printf("9\n");
 	if( (m_WriteOptions & kWriteOption_QualityFast) == 0 ) {
 		// Compressing takes about 50% longer with this on, but produces files a few percent smaller.
 		m_JPEGCompress.optimize_coding = TRUE;
 	}
 
+	printf("10\n");
 	// This makes more of a difference than the documentation suggests, and it's not really slower (faster in some tests).
 	m_JPEGCompress.dct_method = JDCT_ISLOW;
 
+	printf("11\n");
 	if( (m_WriteOptions & kWriteOption_Progressive) != 0 ) {
 		jpeg_simple_progression(&m_JPEGCompress);
 	}
@@ -936,6 +973,7 @@ bool ImageWriterJPEG::beginWrite(unsigned int width, unsigned int height, EImage
 	m_JPEGCompress.comp_info[2].h_samp_factor = 1;
 	m_JPEGCompress.comp_info[2].v_samp_factor = 1;
 
+	printf("12\n");
 	if( Image::colorModelIsRGBA(colorModel) ) {
 		if( m_Quality == 100 || (m_WriteOptions & kWriteOption_ForceNoChromaSubsampling) != 0 ) {
 			m_JPEGCompress.comp_info[0].h_samp_factor = 1;
@@ -955,12 +993,16 @@ bool ImageWriterJPEG::beginWrite(unsigned int width, unsigned int height, EImage
 		SECURE_ASSERT(0);
 	}
 
+	printf("13\n");
 	jpeg_start_compress(&m_JPEGCompress, TRUE);
 
+	printf("14\n");	
 	if( !writeMarkers() ) {
+		printf("15\n");
 		jpeg_destroy_compress(&m_JPEGCompress);
 		return false;
 	}
+	printf("16\n");
 
 	return true;
 }

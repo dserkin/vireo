@@ -73,11 +73,16 @@ ImageWriter* ImageWriter::createWithFormat(EImageFormat imageFormat, ImageWriter
 
 	Factory* factory = factoryForFormat(imageFormat);
 	if( factory != NULL ) {
+		printf("before create factory");
 		writer = factory->create();
+		printf("after create factory");
 	}
+
+	printf("factory %p %s\n", factory, imageFormat);
 
 	if( writer != NULL ) {
 		if( !writer->initWithStorage(output) ) {
+			printf("fail 2\n");
 			delete writer;
 			writer = NULL;
 		}
@@ -90,6 +95,7 @@ ImageWriter::Factory* ImageWriter::factoryForFormat(EImageFormat imageFormat)
 {
 	// First try to find an exact match.
 	for( unsigned int i = 0; i < s_NumWriterFactories; i++ ) {
+		printf("find exact %s : %s\n", s_WriterFactories[i]->getFormat(), imageFormat);
 		if( s_WriterFactories[i]->getFormat() == imageFormat ) {
 			return s_WriterFactories[i];
 		}
@@ -97,12 +103,14 @@ ImageWriter::Factory* ImageWriter::factoryForFormat(EImageFormat imageFormat)
 
 	// Then try to find a fallback.
 	for( unsigned int i = 0; i < s_NumWriterFactories; i++ ) {
+		printf("find fallback %s : %s\n", s_WriterFactories[i]->appropriateForInputFormat(imageFormat), imageFormat);
 		if( s_WriterFactories[i]->appropriateForInputFormat(imageFormat) ) {
 			return s_WriterFactories[i];
 		}
 	}
 
 	if( s_NumWriterFactories > 0 ) {
+		printf("return first %s\n", s_WriterFactories[0]->getFormat());
 		return s_WriterFactories[0];
 	}
 

@@ -442,9 +442,11 @@ bool ImageWriterPNG::beginWrite(unsigned int width, unsigned int height, EImageC
 	if( setjmp(png_jmpbuf(m_PNGCompress)) ) {
 		return false;
 	}
+	printf("1\n");
 	if( !Image::colorModelIsRGBA(colorModel) && !Image::colorModelIsGrayscale(colorModel) ) {
 		return false;
 	}
+	printf("2\n");
 	unsigned int colorType = 0;
 	if( colorModel == kColorModel_RGBX && m_SourceReader != NULL && m_SourceReader->getNativeColorModel() == kColorModel_RGBA ) {
 		colorType = PNG_COLOR_TYPE_RGBA;
@@ -459,12 +461,17 @@ bool ImageWriterPNG::beginWrite(unsigned int width, unsigned int height, EImageC
 	} else {
 		SECURE_ASSERT(0);
 	}
+	printf("3\n");
 	png_set_IHDR(m_PNGCompress, m_PNGInfo, width, height, 8, colorType, PNG_INTERLACE_NONE, PNG_COMPRESSION_TYPE_DEFAULT, PNG_FILTER_TYPE_DEFAULT);
+	printf("4\n");
 	png_write_info(m_PNGCompress, m_PNGInfo);
+	printf("5\n");
 	applyCompressionSettings();
+	printf("6\n");
 	if( colorType == PNG_COLOR_TYPE_RGB ) {
 		png_set_filler(m_PNGCompress, 0, PNG_FILLER_AFTER);
 	}
+	printf("7\n");
 
 	return true;
 }
